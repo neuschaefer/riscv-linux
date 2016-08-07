@@ -9,7 +9,31 @@
 
 __INIT
 ENTRY(_start)
+	/*
+	 * Before anything else, try to detect if we've been started in machine
+	 * mode.  We assume that the kernel image is loaded at
+	 * 0xffffffff80000000 in virtual memory and an address with leading
+	 * zeroes in physical memory.
+	 *
+	 * This heuristic won't work on RV32, if both the virtual and the
+	 * physical address of the kernel are >= 0x80000000.
+	 */
+	auipc t0, 0
+	bltz t0, .Lvirtual_entry
+
+	/* Jump to 0xffffffff80000000 in S-mode */
+	li t0, 0xffffffff80000000
+	csrw mepc, t0
+	csrr t0, mstatus
+	li t1, ~(3<<11)
+	and t0, t0, t1
+	li t2,  (1<<11)
+	or t0, t0, t2
+	csrw mstatus, t0
+	mret
+
 	/* Load the global pointer (before any use of la) */
+.Lvirtual_entry:
 1:	auipc gp, %pcrel_hi(_gp)
 	addi gp, gp, %pcrel_lo(1b)
 
